@@ -66,50 +66,51 @@ fn main() -> ! {
         // Type some stuff into the buffer.
         let mut c = TEXT_BUF.try_lock().unwrap();
         let mut c = Cursor::new(&mut *c);
-        c.fg = WHITE;
-        c.bg = DK_GRAY;
-        c.puts(b"800x600 Attributed Text Demo\n");
-        c.bg = BLACK;
-        c.puts(b"10x16 point characters in an 80x37 grid, with ");
-        c.fg = RED;
-        c.puts(b"foreground");
-        c.fg = WHITE;
-        c.puts(b" and ");
-        c.bg = BLUE;
-        c.puts(b"background");
-        c.bg = BLACK;
-        c.puts(b" colors.\n");
-        c.bg = 0b10_00_00;
-        c.puts(
-            br#"
-       Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam ut
-       tellus quam. Cras ornare facilisis sollicitudin. Quisque quis
-       imperdiet mauris. Proin malesuada nibh dolor, eu luctus mauris
-       ultricies vitae. Interdum et malesuada fames ac ante ipsum primis
-       in faucibus. Aenean tincidunt viverra ultricies. Quisque rutrum
-       vehicula pulvinar.
-
-       Etiam commodo dui quis nibh dignissim laoreet. Aenean erat justo,
-       hendrerit ac adipiscing tempus, suscipit quis dui. Vestibulum ante
-       ipsum primis in faucibus orci luctus et ultrices posuere cubilia
-       Curae; Proin tempus bibendum ultricies. Etiam sit amet arcu quis
-       diam dictum suscipit eu nec odio. Donec cursus hendrerit porttitor.
-       Suspendisse ornare, diam vitae faucibus dictum, leo enim vestibulum
-       neque, id tempor tellus sem pretium lectus. Maecenas nunc nisl,
-       aliquam non quam at, vulputate lacinia dolor. Vestibulum nisi orci,
-       viverra ut neque semper, imperdiet laoreet ligula. Nullam venenatis
-       orci eget nibh egestas, sit amet sollicitudin erat cursus.
-
-       Nullam id ornare tellus, vel porta lectus. Suspendisse pretium leo
-       enim, vel elementum nibh feugiat non. Etiam non vulputate quam, sit
-       amet semper ante. In fermentum imperdiet sem non consectetur. Donec
-       egestas, massa a fermentum viverra, lectus augue hendrerit odio,
-       vitae molestie nibh nunc ut metus. Nulla commodo, lacus nec
-       interdum dignissim, libero dolor consequat mi, non euismod velit
-       sem nec dui. Praesent ligula turpis, auctor non purus eu,
-       adipiscing pellentesque felis."#,
-        );
-        c.putc(b'\n');
+        screen_error(&mut c);
+        // c.fg = WHITE;
+        // c.bg = DK_GRAY;
+        // c.puts(b"800x600 Attributed Text Demo\n");
+        // c.bg = BLACK;
+        // c.puts(b"10x16 point characters in an 80x37 grid, with ");
+        // c.fg = RED;
+        // c.puts(b"foreground");
+        // c.fg = WHITE;
+        // c.puts(b" and ");
+        // c.bg = BLUE;
+        // c.puts(b"background");
+        // c.bg = BLACK;
+        // c.puts(b" colors.\n");
+        // c.bg = 0b10_00_00;
+        // c.puts(
+            // br#"
+       // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam ut
+       // tellus quam. Cras ornare facilisis sollicitudin. Quisque quis
+       // imperdiet mauris. Proin malesuada nibh dolor, eu luctus mauris
+       // ultricies vitae. Interdum et malesuada fames ac ante ipsum primis
+       // in faucibus. Aenean tincidunt viverra ultricies. Quisque rutrum
+       // vehicula pulvinar.
+// 
+       // Etiam commodo dui quis nibh dignissim laoreet. Aenean erat justo,
+       // hendrerit ac adipiscing tempus, suscipit quis dui. Vestibulum ante
+       // ipsum primis in faucibus orci luctus et ultrices posuere cubilia
+       // Curae; Proin tempus bibendum ultricies. Etiam sit amet arcu quis
+       // diam dictum suscipit eu nec odio. Donec cursus hendrerit porttitor.
+       // Suspendisse ornare, diam vitae faucibus dictum, leo enim vestibulum
+       // neque, id tempor tellus sem pretium lectus. Maecenas nunc nisl,
+       // aliquam non quam at, vulputate lacinia dolor. Vestibulum nisi orci,
+       // viverra ut neque semper, imperdiet laoreet ligula. Nullam venenatis
+       // orci eget nibh egestas, sit amet sollicitudin erat cursus.
+// 
+       // Nullam id ornare tellus, vel porta lectus. Suspendisse pretium leo
+       // enim, vel elementum nibh feugiat non. Etiam non vulputate quam, sit
+       // amet semper ante. In fermentum imperdiet sem non consectetur. Donec
+       // egestas, massa a fermentum viverra, lectus augue hendrerit odio,
+       // vitae molestie nibh nunc ut metus. Nulla commodo, lacus nec
+       // interdum dignissim, libero dolor consequat mi, non euismod velit
+       // sem nec dui. Praesent ligula turpis, auctor non purus eu,
+       // adipiscing pellentesque felis."#,
+        // );
+        // c.putc(b'\n');
     }
 
     // Give the driver its hardware resources...
@@ -153,11 +154,13 @@ fn main() -> ! {
                     vga.sync_to_vblank();
                     let mut buf = TEXT_BUF.try_lock().expect("app buf access");
                     let mut c = Cursor::new(&mut *buf);
-                    c.goto(36, 0);
-                    c.bg = 0;
-                    c.fg = 0b00_11_00;
-                    write!(&mut c, "Welcome to frame {}", frame_no).unwrap();
-                    frame_no += 1;
+                    // c.goto(36, 0);
+                    // c.bg = 0;
+                    // c.fg = 0b00_11_00;
+                    // write!(&mut c, "Welcome to frame {}", frame_no).unwrap();
+                    // frame_no += 1;
+
+                    screen_paying(&mut c);
                 }
             },
         )
@@ -226,6 +229,14 @@ impl<'a> Cursor<'a> {
         self.row = row;
         self.col = col;
     }
+
+    /// Clears the buffer.
+    pub fn clear(&mut self) {
+        self.goto(0,0);
+        for i in 0..COLS*ROWS {
+            self.putc(b' ');
+        }
+    }
 }
 
 /// Allows use of a `Cursor` in formatting and `write!`.
@@ -259,4 +270,94 @@ fn TIM3() {
 #[link_section = ".ramcode"]
 fn TIM4() {
     m4vga::tim4_horiz_isr()
+}
+
+// This is all my code
+
+// use stm32f4::stm32f407 as device;
+// let gpiob = &*device::GPIOB::ptr();
+
+fn surround_text(c: &mut Cursor, t: &str, y: usize, x: usize) {
+    let n: usize = t.find('\n').expect("strings will contain \\n") + 3;
+    c.goto(y, x);
+    for _ in (1..n) { c.putc(b' ') }
+    for line in t.lines() {
+        let y = y + 1;
+        c.goto(y, x);
+        c.putc(b' ');
+        c.puts(line.as_bytes());
+        c.putc(b' ');
+    }
+    c.goto(y + 1, x);
+    for _ in (1..n) { c.putc(b' ') }
+
+    // let l: usize = t.find('\n').expect("strings will contain \\n");
+    // let t = t.as_bytes();
+    // c.goto(y, x);
+    // for _ in (1..l+2) { c.putc(b' '); }
+    // for i in (0..t.len()) {
+        // if (i%l == 0) {
+            // c.putc(b' ');
+            // let y = y + 1;
+            // c.goto(y, x);
+            // c.putc(b' ');
+        // }
+        // else {
+            // c.putc(t[i]);
+        // }
+    // }
+    // for _ in (1..l+2) { c.putc(b' '); }
+}
+
+fn screen_error(c: &mut Cursor) {
+    c.bg = BLUE;
+    c.fg = WHITE;
+    c.clear();
+    c.goto(0,0);
+    c.bg = RED;
+    c.puts(b" \n");
+    c.puts(b"                                     ERROR                                      ");
+    c.puts(b" \n");
+    c.bg = BLACK;
+}
+
+fn screen_start(c: &mut Cursor) {
+    const message: &str = "Press any\n button  \nto start!\n";
+    c.bg = DK_GRAY;
+    c.fg = WHITE;
+    c.clear();
+    c.bg = BLUE;
+    c.goto(16,35);
+    c.puts(b"           ");
+    c.goto(17,35);
+    c.puts(b" Press any ");
+    c.goto(18,35);
+    c.puts(b"  button   ");
+    c.goto(19,35);
+    c.puts(b" to start! ");
+    c.goto(20,35);
+    c.puts(b"           ");
+    // surround_text(c, message, 16, 35);
+    c.bg = BLACK;
+}
+
+fn screen_paying(c: &mut Cursor) {
+    c.bg = DK_GRAY;
+    c.fg = WHITE;
+    c.clear();
+    c.bg = BLUE;
+    c.goto(0,0);
+    c.puts(b" \n");
+    c.puts(b"                                    Payment                                     ");
+    c.puts(b" \n");
+
+    c.goto(17,35);
+    c.puts(b"          ");
+    c.goto(18,35);
+    c.puts(b"  Please  ");
+    c.goto(19,35);
+    c.puts(b" pay now. ");
+    c.goto(20,35);
+    c.puts(b"          ");
+    c.bg = BLACK;
 }
