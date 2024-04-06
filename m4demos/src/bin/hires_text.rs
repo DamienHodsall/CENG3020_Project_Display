@@ -40,6 +40,7 @@ extern crate panic_itm;
 
 use stm32f4;
 use stm32f4::stm32f407::interrupt;
+use stm32f4::stm32f407 as device;
 
 use font_10x16;
 use m4vga::rast::text_10x16::{self, AChar};
@@ -113,8 +114,32 @@ fn main() -> ! {
         // c.putc(b'\n');
     }
 
+    let mut cp = cortex_m::peripheral::Peripherals::take().unwrap();
+    let p = device::Peripherals::take().unwrap();
+
+    // allow clock to access gpioc
+    p.RCC.ahb1enr.modify(|_, w| {w.gpiocen().enabled()});
+    // turn on gpioc input for pins 7 8 9
+    p.GPIOC.moder.modify(|_, w| w.moder7().input().moder8().input().moder9().input());
+    // simplify input as idr
+    let input = &p.GPIOC.idr;
+
+    let mut s0: u8 = 0;
+
     // Give the driver its hardware resources...
-    m4vga::take_hardware()
+    m4vga::init(
+        cp.NVIC,
+        &mut cp.SCB,
+        p.FLASH,
+        &p.DBG,
+        p.RCC,
+        p.GPIOB,
+        p.GPIOE,
+        p.TIM1,
+        p.TIM3,
+        p.TIM4,
+        p.DMA2,
+        )
         // ...select a display timing...
         .configure_timing(&m4vga::timing::SVGA_800_600)
         // ... and provide a raster callback.
@@ -145,8 +170,9 @@ fn main() -> ! {
             |vga| {
                 // Enable outputs. The driver doesn't do this for you in case
                 // you want to set up some graphics before doing so.
+
                 vga.video_on();
-                let mut frame_no = 0;
+                // let mut frame_no = 0;
                 // Spin forever!
                 loop {
                     use core::fmt::Write;
@@ -160,7 +186,34 @@ fn main() -> ! {
                     // write!(&mut c, "Welcome to frame {}", frame_no).unwrap();
                     // frame_no += 1;
 
-                    screen_paying(&mut c);
+                    let s = ((input.read().idr7().bit() as u8) << 0) + ((input.read().idr8().bit() as u8) << 1) + ((input.read().idr9().bit() as u8) << 2);
+
+                    // test if the screen is being updated every cycle or on change
+                    // point will show if it works as expected
+                    // c.goto(36,0);
+                    // c.bg = RED;
+                    // c.fg = BLUE;
+                    // c.putc(b'*');
+
+                    if s0 != s {
+                        match s {
+                            0b000 => screen_error(&mut c),
+                            0b001 => screen_start(&mut c),
+                            0b010 => screen_paying(&mut c),
+                            0b011 => screen_confirm(&mut c),
+                            0b100 => screen_line1(&mut c),
+                            0b101 => screen_line2(&mut c),
+                            0b110 => screen_thanks(&mut c),
+                            _ => screen_error(&mut c),
+                        }
+                    }
+
+                    s0 = s + 0;
+
+                    c.bg = RED;
+                    c.fg = WHITE;
+                    c.goto(35, 77);
+                    write!(&mut c, "{:03b}", s);
                 }
             },
         )
@@ -233,7 +286,7 @@ impl<'a> Cursor<'a> {
     /// Clears the buffer.
     pub fn clear(&mut self) {
         self.goto(0,0);
-        for i in 0..COLS*ROWS {
+        for _i in 0..COLS*ROWS {
             self.putc(b' ');
         }
     }
@@ -274,58 +327,67 @@ fn TIM4() {
 
 // This is all my code
 
-// use stm32f4::stm32f407 as device;
-// let gpiob = &*device::GPIOB::ptr();
+// fn read_bits(gpioa: &device::GPIOA) -> u8 {
+//     ((gpioa.idr.read().idr7().bit() as u8) << 0) + ((gpioa.idr.read().idr8().bit() as u8) << 1) + ((gpioa.idr.read().idr9().bit() as u8) << 2)
+// }
 
-fn surround_text(c: &mut Cursor, t: &str, y: usize, x: usize) {
-    let n: usize = t.find('\n').expect("strings will contain \\n") + 3;
-    c.goto(y, x);
-    for _ in (1..n) { c.putc(b' ') }
-    for line in t.lines() {
-        let y = y + 1;
-        c.goto(y, x);
-        c.putc(b' ');
-        c.puts(line.as_bytes());
-        c.putc(b' ');
-    }
-    c.goto(y + 1, x);
-    for _ in (1..n) { c.putc(b' ') }
+// fn surround_text(c: &mut Cursor, t: &str, y: usize, x: usize) {
+//     let n: usize = t.find('\n').expect("strings will contain \\n") + 3;
+//     c.goto(y, x);
+//     for _ in (1..n) { c.putc(b' ') }
+//     for line in t.lines() {
+//         let y = y + 1;
+//         c.goto(y, x);
+//         c.putc(b' ');
+//         c.puts(line.as_bytes());
+//         c.putc(b' ');
+//     }
+//     c.goto(y + 1, x);
+//     for _ in (1..n) { c.putc(b' ') }
 
-    // let l: usize = t.find('\n').expect("strings will contain \\n");
-    // let t = t.as_bytes();
-    // c.goto(y, x);
-    // for _ in (1..l+2) { c.putc(b' '); }
-    // for i in (0..t.len()) {
-        // if (i%l == 0) {
-            // c.putc(b' ');
-            // let y = y + 1;
-            // c.goto(y, x);
-            // c.putc(b' ');
-        // }
-        // else {
-            // c.putc(t[i]);
-        // }
-    // }
-    // for _ in (1..l+2) { c.putc(b' '); }
-}
+//     // let l: usize = t.find('\n').expect("strings will contain \\n");
+//     // let t = t.as_bytes();
+//     // c.goto(y, x);
+//     // for _ in (1..l+2) { c.putc(b' '); }
+//     // for i in (0..t.len()) {
+//         // if (i%l == 0) {
+//             // c.putc(b' ');
+//             // let y = y + 1;
+//             // c.goto(y, x);
+//             // c.putc(b' ');
+//         // }
+//         // else {
+//             // c.putc(t[i]);
+//         // }
+//     // }
+//     // for _ in (1..l+2) { c.putc(b' '); }
+// }
 
 fn screen_error(c: &mut Cursor) {
+
+    // reset
     c.bg = BLUE;
     c.fg = WHITE;
     c.clear();
+
+    // title
     c.goto(0,0);
     c.bg = RED;
     c.puts(b" \n");
     c.puts(b"                                     ERROR                                      ");
     c.puts(b" \n");
+
     c.bg = BLACK;
 }
 
 fn screen_start(c: &mut Cursor) {
-    const message: &str = "Press any\n button  \nto start!\n";
+
+    // reset
     c.bg = DK_GRAY;
     c.fg = WHITE;
     c.clear();
+
+    // message
     c.bg = BLUE;
     c.goto(16,35);
     c.puts(b"           ");
@@ -337,20 +399,25 @@ fn screen_start(c: &mut Cursor) {
     c.puts(b" to start! ");
     c.goto(20,35);
     c.puts(b"           ");
-    // surround_text(c, message, 16, 35);
+
     c.bg = BLACK;
 }
 
 fn screen_paying(c: &mut Cursor) {
+
+    // reset
     c.bg = DK_GRAY;
     c.fg = WHITE;
     c.clear();
+
+    // title
     c.bg = BLUE;
     c.goto(0,0);
     c.puts(b" \n");
     c.puts(b"                                    Payment                                     ");
     c.puts(b" \n");
 
+    // message
     c.goto(17,35);
     c.puts(b"          ");
     c.goto(18,35);
@@ -359,5 +426,256 @@ fn screen_paying(c: &mut Cursor) {
     c.puts(b" pay now. ");
     c.goto(20,35);
     c.puts(b"          ");
+
     c.bg = BLACK;
+}
+
+fn screen_confirm(c: &mut Cursor) {
+
+    // reset
+    c.bg = DK_GRAY;
+    c.fg = WHITE;
+    c.clear();
+
+    // title
+    c.bg = BLUE;
+    c.goto(0,0);
+    c.puts(b" \n");
+    c.puts(b"                                  Confirmation                                  ");
+    c.puts(b" \n");
+
+    // message
+    c.goto(17,35);
+    c.puts(b"           ");
+    c.goto(18,35);
+    c.puts(b"  Do you   ");
+    c.goto(19,35);
+    c.puts(b"  want to  ");
+    c.goto(20,35);
+    c.puts(b" continue? ");
+    c.goto(21,35);
+    c.puts(b"           ");
+
+    // option 1 (top left)
+    c.bg = 0b00_10_00;
+    c.goto(11,0);
+    c.puts(b"     ");
+    c.goto(12,0);
+    c.puts(b" YES ");
+    c.goto(13,0);
+    c.puts(b"     ");
+
+    // option 2 (bottom left)
+    c.bg = 0b00_00_10;
+    c.goto(24,0);
+    c.puts(b"     ");
+    c.goto(25,0);
+    c.puts(b" NO  ");
+    c.goto(26,0);
+    c.puts(b"     ");
+
+    c.bg = BLACK;
+}
+
+fn screen_line1(c: &mut Cursor) {
+
+    // reset
+    c.bg = DK_GRAY;
+    c.fg = WHITE;
+    c.clear();
+
+    // title
+    c.bg = BLUE;
+    c.goto(0,0);
+    c.puts(b" \n");
+    c.puts(b"                                     Line 1                                     ");
+    c.puts(b" \n");
+
+    c.goto(16,35);
+    c.puts(b"           ");
+    c.goto(17,35);
+    c.puts(b" Choose a  ");
+    c.goto(18,35);
+    c.puts(b" ticket to ");
+    c.goto(19,35);
+    c.puts(b" purchase  ");
+    c.goto(20,35);
+    c.puts(b"           ");
+
+    // option 1 (top left)
+    c.goto(10,0);
+    c.puts(b"      ");
+    c.goto(11,0);
+    c.puts(b"   A  ");
+    c.goto(12,0);
+    c.puts(b"      ");
+
+    // option 2 (top right)
+    c.goto(10,74);
+    c.puts(b"      ");
+    c.goto(11,74);
+    c.puts(b"  B   ");
+    c.goto(12,74);
+    c.puts(b"      ");
+
+    // option 3 (bottom left)
+    c.goto(25,0);
+    c.puts(b"      ");
+    c.goto(26,0);
+    c.puts(b" QUIT ");
+    c.goto(27,0);
+    c.puts(b"      ");
+
+    // option (bottom right)
+    c.goto(25,74);
+    c.puts(b"      ");
+    c.goto(26,74);
+    c.puts(b" NEXT ");
+    c.goto(27,74);
+    c.puts(b"      ");
+}
+
+fn screen_line2(c: &mut Cursor) {
+
+    // reset
+    c.bg = DK_GRAY;
+    c.fg = WHITE;
+    c.clear();
+
+    // title
+    c.bg = BLUE;
+    c.goto(0,0);
+    c.puts(b" \n");
+    c.puts(b"                                     Line 2                                     ");
+    c.puts(b" \n");
+
+    c.goto(16,35);
+    c.puts(b"           ");
+    c.goto(17,35);
+    c.puts(b" Choose a  ");
+    c.goto(18,35);
+    c.puts(b" ticket to ");
+    c.goto(19,35);
+    c.puts(b" purchase  ");
+    c.goto(20,35);
+    c.puts(b"           ");
+
+    // option 1 (top left)
+    c.goto(10,0);
+    c.puts(b"      ");
+    c.goto(11,0);
+    c.puts(b"   C  ");
+    c.goto(12,0);
+    c.puts(b"      ");
+
+    // option 2 (top right)
+    c.goto(10,74);
+    c.puts(b"      ");
+    c.goto(11,74);
+    c.puts(b"  D   ");
+    c.goto(12,74);
+    c.puts(b"      ");
+
+    // option 3 (bottom left)
+    c.goto(25,0);
+    c.puts(b"      ");
+    c.goto(26,0);
+    c.puts(b" PREV ");
+    c.goto(27,0);
+    c.puts(b"      ");
+
+    // option (bottom right)
+    c.goto(25,74);
+    c.puts(b"      ");
+    c.goto(26,74);
+    c.puts(b" NEXT ");
+    c.goto(27,74);
+    c.puts(b"      ");
+}
+
+fn screen_line3(c: &mut Cursor) {
+
+    // reset
+    c.bg = DK_GRAY;
+    c.fg = WHITE;
+    c.clear();
+
+    // title
+    c.bg = BLUE;
+    c.goto(0,0);
+    c.puts(b" \n");
+    c.puts(b"                                     Line 3                                     ");
+    c.puts(b" \n");
+
+    c.goto(16,35);
+    c.puts(b"           ");
+    c.goto(17,35);
+    c.puts(b" Choose a  ");
+    c.goto(18,35);
+    c.puts(b" ticket to ");
+    c.goto(19,35);
+    c.puts(b" purchase  ");
+    c.goto(20,35);
+    c.puts(b"           ");
+
+    // option 1 (top left)
+    c.goto(10,0);
+    c.puts(b"      ");
+    c.goto(11,0);
+    c.puts(b"   E  ");
+    c.goto(12,0);
+    c.puts(b"      ");
+
+    // option 2 (top right)
+    c.goto(10,74);
+    c.puts(b"      ");
+    c.goto(11,74);
+    c.puts(b"  F   ");
+    c.goto(12,74);
+    c.puts(b"      ");
+
+    // option 3 (bottom left)
+    c.goto(25,0);
+    c.puts(b"      ");
+    c.goto(26,0);
+    c.puts(b" PREV ");
+    c.goto(27,0);
+    c.puts(b"      ");
+
+    // option (bottom right)
+    c.goto(25,74);
+    c.puts(b"      ");
+    c.goto(26,74);
+    c.puts(b" QUIT ");
+    c.goto(27,74);
+    c.puts(b"      ");
+}
+
+fn screen_thanks(c: &mut Cursor) {
+
+    // reset
+    c.bg = DK_GRAY;
+    c.fg = WHITE;
+    c.clear();
+
+    // title
+    c.bg = BLUE;
+    c.goto(0,0);
+    c.puts(b" \n");
+    c.puts(b"                                    Thank You                                   ");
+    c.puts(b" \n");
+
+    // message
+    c.bg = 0b00_01_00; // Green
+    c.fg = BLACK;
+    c.goto(17,34);
+    c.puts(b"            ");
+    c.goto(18,34);
+    c.puts(b" Thanks for ");
+    c.goto(19,34);
+    c.puts(b" travelling ");
+    c.goto(20,34);
+    c.puts(b"  with us!  ");
+    c.goto(21,34);
+    c.puts(b"            ");
 }
