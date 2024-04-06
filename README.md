@@ -2,6 +2,12 @@
 
 [![Build Status](https://travis-ci.org/cbiffle/m4vga-rs.svg?branch=master)](https://travis-ci.org/cbiffle/m4vga-rs)
 
+# DISCLAIMER
+
+I (DamienHodsall) did not make this project. This was used in my CENG3020 Final project. The only contributions I have made is in editing the hires_text demo to fit the needs of said project.
+
+# Continuing
+
 This crate provides 800x600 60fps graphics on the STM32F407 microcontroller. The
 observant reader will note that the STM32F407 has no video hardware, or enough
 RAM to hold an 800x600 color image. So how does `m4vga` get high-res color video
